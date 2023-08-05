@@ -4,13 +4,19 @@ const bcrypt = require('bcrypt');
 const userSchema = new mongoose.Schema({
     firstName: {
     type: String,
-    required: false,
+    required: true,
     unique: false,
     },
     lastName: {
     type: String,
-    required: false,
+    required: true,
     unique: false,
+  },
+    // name that people will see on ur comments
+     name: {
+    type: String,
+    required: false,
+    unique: true,
   },
   username: {
     type: String,

@@ -8,7 +8,13 @@ const VerifyJwt = asyncHandler(async (req, res, next) => {
         return res.status(401).json({ message: `Unauthorized` })
     }
     const token = authHeader?.split(' ')[1];
-    
+    // console.log(token);
+    // jwt.TokenExpiredError()
+    if (!token) {
+        return res.status(401).json({ message: `Unauthorized no auth payload` })
+        
+    }
+
     jwt.verify(token,
         process.env.ACCESS_TOKEN_SECRET,
         (err, decoded) => {
@@ -16,6 +22,7 @@ const VerifyJwt = asyncHandler(async (req, res, next) => {
             req.role = decoded.AuthData.role;
             req.user = decoded.AuthData.user;
             next()
+            
     })
 
     

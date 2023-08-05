@@ -11,6 +11,7 @@ const upload = require('./middlewares/upload');
 const BlogModel = require('./models/BlogModel');
 const user = require('./models/user');
 const port = process.env.PORT;
+
 app.use(cors({origin: "*"}))
 app.use(express.json())
 app.use(cookieParser())
@@ -23,8 +24,8 @@ connectDatabase()
 
 
 
-app.use('static', express.static(path.join(__dirname, 'images')))
 app.use(express.static(path.join(__dirname, 'images')))
+// app.use('static', express.static(path.join(__dirname, 'images')))
 
 
 const IMAGES_DIR = './images'; // directory where images are stored
@@ -32,11 +33,7 @@ const PAGE_SIZE = 10; // number of images to display per page
 
 app.post(`/normaldata`, async (req, res) => {
   // const blogs = await BlogModel.find().exec()
-  await BlogModel.updateMany({}, {publish:true });
-  // const editor = await user.findOne({role:'editor'})
-  // const updates = await BlogModel.updateMany({},
-  //   {$set:{published:true}
-  //      })
+  
   
   return res.json({message:`done action`})
 })
@@ -64,10 +61,10 @@ app.post(`/image-upload`,  upload.single('file'), function (req, res) {
         return res.json({message: `${filename} not uploaded`, filename, fileurl: `${apiUrl}/${filename}`})
 
 })
-app.use('/api/v1/blogs', require('./routes/blogRoutes'))
-app.use('/api/v1/users', require('./routes/userRoutes'))
-app.use('/api/v1/auth', require('./routes/authRoutes'))
-app.use('/api/v1/comments', require('./routes/commentRoutes'))
+app.use('/mbyes_api/v1/blogs', require('./routes/blogRoutes'))
+app.use('/mbyes_api/v1/users', require('./routes/userRoutes'))
+app.use('/mbyes_api/v1/auth', require('./routes/authRoutes'))
+app.use('/mbyes_api/v1/comments', require('./routes/commentRoutes'))
 
 
 

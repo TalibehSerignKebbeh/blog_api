@@ -40,12 +40,18 @@ updated_timezoneOffset:created_timezoneOffset
   return res.status(400).json({ status: "error", message: "An error occured" });
 });
 
+
 const GetBlogs = asyncHandler(async (req, res) => {
   const { page, size } = req.query;
+  // console.log(page, size);
+  // console.log(req.query);
   const blogs = await BlogModel.find().populate({path:'author', select:`-password`}).skip(+page * +size).limit(+size).exec();
   const total = await BlogModel.countDocuments();
   const pageCount = Math.ceil(+total / +size)
-  return res.json({ status: "success", blogs, total, pageCount, size, page });
+  return res.json({
+    status: "success",
+    blogs, total, pageCount, size, page
+  });
 });
 
 const DeleteBlog = asyncHandler(async (req, res) => {
@@ -113,7 +119,7 @@ const ToggleBlogPublished = asyncHandler(async (req, res) => {
   }
   const blog = await BlogModel.findById(id).exec()
   if(!blog) return res.sendStatus(400).json({message:`Blog not found`})
-  await BlogModel.findByIdAndUpdate(id, {publish: !blog?.publish}).exec();
+  await BlogModel.findByIdAndUpdate(id, { publish: !blog?.publish }).exec();
   return res.json({ message: `update succussful`, status:'success' });
 
 })
@@ -136,10 +142,18 @@ const GetDashBoardStatistics = asyncHandler(async (req, res) => {
   })
 })
 
-const RefetchRecentBlogs = asyncHandler(async() => {
+const RefetchRecentBlogs = asyncHandler(async(req, res) => {
   const recentBlogs = await BlogModel.find({}, {}).select('-content').populate({path:'author', select:'-password'}).sort({created_at:-1, publish:-1}).limit(10)
   return res.json({recentBlogs})
 })
+
+
+const GetTagBlogs = asyncHandler(async (req, res) => {
+  const tag = req.params.tag || req.query.tag;
+  const blogs = await BlogModel.find({ tags: tag }).lean();
+  return res.json({blogs})
+})
+
 function convertBase64ToFile(base64String, filePath) {
   const base64Data = base64String.replace(/^data:image\/\w+;base64,/, "");
   const buffer = Buffer.from(base64Data, "base64");
@@ -148,6 +162,8 @@ function convertBase64ToFile(base64String, filePath) {
 
   return filePath;
 }
+
+
 
 module.exports = {
   PostBlog,
@@ -159,5 +175,6 @@ module.exports = {
   GetDashBoardStatistics,
   UpdateBlog,
   ToggleBlogPublished,
-  RefetchRecentBlogs
+  RefetchRecentBlogs,
+  GetTagBlogs
 };

@@ -7,6 +7,12 @@ const commentSchema = new mongoose.Schema(
       ref: 'blogs',
       required: true
     },
+     parent_comment: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'BlogComment',
+       required: false,
+      default: null
+    },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'bloguser',

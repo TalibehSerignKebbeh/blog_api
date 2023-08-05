@@ -15,14 +15,18 @@ const Login = asyncHandler(async (req, res) => {
 
     if (!password_match) return res.status(400).json({ message: `invalid credentials` })
     const token = jwt.sign(
+        
         {
             "AuthData": {
                 user: user.username,
-                role: user.role
+                role: user.role,
+                id: user?.id
             }
         },
         process.env.ACCESS_TOKEN_SECRET,
-        { expiresIn: '2h', }
+        {
+            expiresIn: '2h',
+        }
 
     )
     const refreshToken = jwt.sign({
@@ -44,7 +48,7 @@ const Login = asyncHandler(async (req, res) => {
 
 const getRefreshToken = asyncHandler(async (req, res) => {
     const cookie = req.cookies
-    console.log(cookie);
+    // console.log(cookie);
     if (!cookie?.jwt) return res.status(400).json({ message: `Unauthorized` })
     const refresh_token = cookie.jwt;
 
@@ -57,7 +61,8 @@ const getRefreshToken = asyncHandler(async (req, res) => {
                 {
                     "AuthData": {
                         user: user.username,
-                        role: user.role
+                        role: user.role,
+                        id: user?.id
                     }
                 },
                 process.env.ACCESS_TOKEN_SECRET,

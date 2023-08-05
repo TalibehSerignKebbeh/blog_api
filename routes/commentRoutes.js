@@ -1,16 +1,20 @@
 const express = require('express')
 
-const { GetAllComments, GetCommentsForBlog, GetCommentsForUser, PostComment } = require('../controllers/commentController')
+const { GetAllComments, GetCommentsForBlog,
+    GetCommentsForUser, PostComment,
+LikeComment} = require('../controllers/commentController')
 const { VerifyJwt } = require('../middlewares/VerifyJwt')
 
 const router = express.Router()
 
 router.route('/').get(GetAllComments)
-router.use(VerifyJwt)
+router.route('/:id').patch(VerifyJwt, LikeComment)
 router.route('/blog/:id').
     get(GetCommentsForBlog)
-    .post(PostComment)
-router.route('/user/:id').get(GetCommentsForBlog)
+    .post(VerifyJwt, PostComment)
+// router.route('')
+  
+router.route('/user/:id').get(VerifyJwt, GetCommentsForUser)
 
 
 module.exports = router;

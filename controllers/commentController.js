@@ -5,10 +5,25 @@ const mongoose =require('mongoose')
 
 // Fetch comments for a single blog
 const GetCommentsForBlog = asyncHandler(async (req, res) => {
-  const { id, page, limit } = req.params;
-  console.log(id, page, limit);
-  const comments = await Comment.find({ blog:id,IsReply:false}, {},{populate:{path:'user', select:'-password'}}).sort({ createdAt: -1 }).skip(+(page-1) * +limit).limit(+limit).exec();
-  return res.json({comments});
+  // const { limit } = req.params;
+  const id = req.params.id || req.query.id;
+  const page = req.params.page || req.query.page || 1;
+  const limit = req.params.limit || req.query.limit || 1;
+  const offset = req.query.offset || req.params.offset || 0;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.json({message: 'invalid id'})
+  }
+
+  // console.log(id, page, limit);
+  const comments = await Comment.find({ blog: id, parent_comment: null },
+    {}, { populate: { path: 'user', select: '-password' } })
+    .sort({ createdAt: -1 })
+    .skip(+offset).limit(+limit).lean().exec();
+  const commentsWithReplyCount = await Promise.all(comments?.map( async(comment) => {
+    const reply_count = await Comment.countDocuments({ parent_comment: comment?.id }).exec();
+    return {...comment, reply_count}
+  }))
+  return res.json({comments: commentsWithReplyCount});
 });
 
 // Fetch comments for a single user
@@ -29,7 +44,7 @@ const GetAllComments = asyncHandler(async (req, res) => {
 });
 
 const LikeComment = asyncHandler(async (req, res) => {
-  const id = req.params.id;
+  const id = req.params.id || req.query?.id;
   const username = req.user;
   const TheUser = await user.findOne({ username }).exec()
   
@@ -43,8 +58,23 @@ const LikeComment = asyncHandler(async (req, res) => {
   if (!comment) {
     return res.status(400).json({ message: 'comment not found',status:'error' });
   }
-  const updated = await Comment.findByIdAndUpdate(id, { $push: { likes: TheUser?.id } })
-  return res.json({message:`comment add successfully`})
+  if (!comment?.likes?.includes(TheUser?.id)) {
+    await Comment.findByIdAndUpdate(id, { $push: { likes: TheUser?.id } })
+    const updatedComment = await Comment.findById(id)
+      .populate({ path: 'user', select: '-password ' })
+      .exec();
+    
+  return res.json({message:`comment liked`,
+  comment: updatedComment})
+  } else {
+    await Comment.findByIdAndUpdate(id, { $pull: { likes: TheUser?.id } })
+    const updatedComment = await Comment.findById(id)
+      .populate({ path: 'user', select: '-password ' }).exec();
+    
+
+  return res.json({message:`comment unliked`,
+  comment: updatedComment})
+  }
 });
 const PostComment = asyncHandler(async (req, res) => {
   const { message } = req.body;
