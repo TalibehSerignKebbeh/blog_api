@@ -38,21 +38,48 @@ updated_timezoneOffset:created_timezoneOffset
     });
   }
   return res.status(400).json({ status: "error", message: "An error occured" });
-});
+}); 
 
 
 const GetBlogs = asyncHandler(async (req, res) => {
   const { page, size } = req.query;
-  // console.log(page, size);
+  console.log(page, size);
   // console.log(req.query);
-  const blogs = await BlogModel.find().populate({path:'author', select:`-password`}).skip(+page * +size).limit(+size).exec();
+  const blogs = await BlogModel.find().sort({ created_at: -1, publish: -1 })
+    .populate({ path: 'author', select: `-password` })
+    .skip(+page * +size).limit(+size).exec();
   const total = await BlogModel.countDocuments();
   const pageCount = Math.ceil(+total / +size)
   return res.json({
     status: "success",
-    blogs, total, pageCount, size, page
+    blogs, total, pageCount, size, page,
   });
 });
+const GetBlogsInfinitely = asyncHandler(async (req, res) => {
+  const { page, size, offset } = req.query;
+
+  const blogs = await BlogModel.find()
+    .sort({ created_at: -1, publish: -1 })
+    .populate({ path: 'author', select: `-password` })
+    .skip(+offset)
+    .limit(+size)
+    .exec();
+
+  const total = await BlogModel.countDocuments();
+  const pageCount = Math.ceil(total / +size);
+  const offsetValue = Number(size) + Number(offset);
+  
+  return res.json({
+    status: "success",
+    blogs,
+    total,
+    pageCount,
+    size,
+    page,
+    offset: offsetValue,
+  });
+});
+
 
 const DeleteBlog = asyncHandler(async (req, res) => {
   const id = req.params.id;
@@ -149,9 +176,30 @@ const RefetchRecentBlogs = asyncHandler(async(req, res) => {
 
 
 const GetTagBlogs = asyncHandler(async (req, res) => {
+
   const tag = req.params.tag || req.query.tag;
-  const blogs = await BlogModel.find({ tags: tag }).lean();
-  return res.json({blogs})
+  const page = req.query.page || req.params.page || 0;
+  const size = req.params.pageSize || req.query.pageSize || 10;
+  const queryFilters = {
+    $or: [
+      { title: { $regex: tag, $options:'i' } },
+      { tags: {$regex:tag, $options:'i'} },
+      // {content: { $regex: tag, $options:'i' }}
+    ]
+  }
+  const queryFilters2 = {
+    $or: [{ title: { $regex: `${tag}`, $options: 'i' } },
+      { tags: { $regex: `${tag}`, $options: 'i' } },
+    { content: { $regex: `${tag}`, $options: 'i' } }
+    ]
+  }
+  
+  const blogs = await BlogModel.find({...queryFilters}).skip(+page * +size).limit(+size).lean();
+  const total = await BlogModel.countDocuments({...queryFilters})
+  return res.json({
+    blogs, page, pageSize: size,
+    total
+  })
 })
 
 function convertBase64ToFile(base64String, filePath) {
@@ -176,5 +224,5 @@ module.exports = {
   UpdateBlog,
   ToggleBlogPublished,
   RefetchRecentBlogs,
-  GetTagBlogs
+  GetTagBlogs,GetBlogsInfinitely
 };
