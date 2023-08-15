@@ -1,10 +1,19 @@
 const mongoose = require('mongoose')
 
 
+const likeSchema = mongoose.Schema({
+    user: { type: mongoose.Types.ObjectId, required: false,ref:'bloguser' },
+    date: {
+        type: Date,
+        default:  Date.now,
+    }
+})
+
 const blogSchema = mongoose.Schema({
     author: { type: mongoose.Types.ObjectId, required: false,ref:'bloguser' },
+    publisher: { type: mongoose.Types.ObjectId, required: false,ref:'bloguser' },
     image:{type: String, required: false},
-    likes:{type: [mongoose.Types.ObjectId], required: false},
+    likes:{type: [likeSchema], required: false},
     category: { type: mongoose.Types.ObjectId, required: false },
     title: { type: String, required: false },
     publish:{type: Boolean, default:false},
@@ -16,18 +25,15 @@ const blogSchema = mongoose.Schema({
         type: Date,
         default: Date.now,
     },
-     created_timezoneOffset: {
-         type: Number,
-        default: new Date().getTimezoneOffset(),
+    publish_date: {
+        type: Date,
+        required:false,
     },
+    
      updated_at: {
         type: Date, default: Date.now,
     },
-     updated_timezoneOffset: {
-    type: Number,
-            default: new Date().getTimezoneOffset(),
-
-  },
+    
 })
 
 

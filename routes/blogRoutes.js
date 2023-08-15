@@ -8,7 +8,11 @@ const { PostBlog, GetBlogs, DeleteBlog,
     ToggleBlogPublished,
     RefetchRecentBlogs, 
     GetTagBlogs,
-    GetBlogsInfinitely} = require('../controllers/blogController')
+    GetBlogsInfinitely,
+    LikeBlog,
+    GetUserDashboardData,
+    GetUsersBlogs,
+UserUpdateBlog} = require('../controllers/blogController')
 const { VerifyJwt } = require('../middlewares/VerifyJwt')
 
 
@@ -25,6 +29,11 @@ router.route('/tags/:tag').get(GetTagBlogs)
 router.route('/').post(VerifyJwt,upload.single('image'), PostBlog)
 router.route('/stats').get(VerifyJwt,GetDashBoardStatistics)
 router.route('/stats/recent').get(VerifyJwt,RefetchRecentBlogs)
+router.route('/stats/user')
+    .get(VerifyJwt, GetUserDashboardData)
+router.route('/user')
+    .get(VerifyJwt, GetUsersBlogs)
+    .put(VerifyJwt, UserUpdateBlog)
 
 router.route('/:id')
     .get(GetSingleBlogById)
@@ -32,6 +41,7 @@ router.route('/:id')
     .delete(VerifyJwt, DeleteBlog)
     .put(VerifyJwt, UpdateBlog)
     .patch(VerifyJwt, ToggleBlogPublished)
+router.route('/:id/like').patch(VerifyJwt, LikeBlog)
 
 
 module.exports = router

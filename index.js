@@ -33,9 +33,11 @@ const PAGE_SIZE = 10; // number of images to display per page
 
 app.post(`/normaldata`, async (req, res) => {
   // const blogs = await BlogModel.find().exec()
+  const updates =await user.updateMany({profile:'profile'}, {profile:''})
   
-  
-  return res.json({message:`done action`})
+  return res.json({
+    message: `done action`,
+  updates})
 })
 // Route for getting images
 app.get('/images', (req, res) => {

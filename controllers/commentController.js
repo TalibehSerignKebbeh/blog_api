@@ -19,11 +19,19 @@ const GetCommentsForBlog = asyncHandler(async (req, res) => {
     {}, { populate: { path: 'user', select: '-password' } })
     .sort({ createdAt: -1 })
     .skip(+offset).limit(+limit).lean().exec();
+  
+  if (!comments?.length) {
+    return res.status(400).json({message:'no comments '})
+  }
   const commentsWithReplyCount = await Promise.all(comments?.map( async(comment) => {
     const reply_count = await Comment.countDocuments({ parent_comment: comment?.id }).exec();
     return {...comment, reply_count}
   }))
-  return res.json({comments: commentsWithReplyCount});
+
+  const total = await Comment.countDocuments({blog:id, parent_comment:null})
+  return res.json({
+    comments: commentsWithReplyCount,
+  total:total});
 });
 
 // Fetch comments for a single user

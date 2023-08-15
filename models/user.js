@@ -13,12 +13,18 @@ const userSchema = new mongoose.Schema({
     unique: false,
   },
     // name that people will see on ur comments
-     name: {
+     public_name: {
     type: String,
     required: false,
     unique: true,
   },
   username: {
+    type: String,
+    required: true,
+    unique: true,
+    
+  },
+   email: {
     type: String,
     required: true,
     unique: true,
@@ -39,7 +45,17 @@ const userSchema = new mongoose.Schema({
       type: String,
     default: 'user'
   },
+     verifyToken: {
+    type: String,
+    required: false,
+    
+  },
 }, {});
+
+// userSchema.virtual('fullname', {
+//   getters(data) {
+  
+// }})
 
 userSchema.pre('save', async function (next) {
   try {
