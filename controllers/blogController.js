@@ -17,7 +17,6 @@ created_timezoneOffset,
   const username = req.user;
   const currentUser = await user.findOne({ username }).exec()
   if (!currentUser) return res.status(401).json({ message: `Unauthorized access` })
- 
 
   const newBlog = await BlogModel.create({
     title,
@@ -43,8 +42,6 @@ updated_timezoneOffset:created_timezoneOffset
 
 const GetBlogs = asyncHandler(async (req, res) => {
   const { page, size } = req.query;
-  // await BlogModel.updateMany({}, {})
-  // const admin = await user.findOne({role:'admin'}).lean().exec()
   const queryFilters = req.query.keyword
     ? {
       $or: [
@@ -56,16 +53,11 @@ const GetBlogs = asyncHandler(async (req, res) => {
     }
     : {}
   const blogs = await BlogModel.find({...queryFilters}).sort({ created_at: -1, publish: -1,  })
-    .populate({ path: 'author', select: `-password -content` })
+    .populate({ path: 'author', select: `-password` })
+    .populate({ path: 'publisher', select: `-password` })
     .populate({ path: 'likes.user', select: `-password` })
     .skip(+page * +size).limit(+size).exec();
-  
-  // await Promise.all(blogs?.map(async(blog) => {
-  //   await BlogModel.findByIdAndUpdate(blog?._id, {
-  //     publish_date: blog?.publish ? blog?.created_at : '',
-  //     publisher:blog?.publish ? admin?._id : null,
-  //     })
-  // }))
+ 
   const total = await BlogModel.countDocuments({...queryFilters});
   const pageCount = Math.ceil(+total / +size)
   return res.json({
