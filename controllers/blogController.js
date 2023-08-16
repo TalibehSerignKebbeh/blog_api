@@ -52,7 +52,8 @@ const GetBlogs = asyncHandler(async (req, res) => {
       ],
     }
     : {}
-  const blogs = await BlogModel.find({...queryFilters}).sort({ created_at: -1, publish: -1,  })
+  const blogs = await BlogModel.find({ ...queryFilters })
+    .sort({ created_at: -1, publish: -1, })
     .populate({ path: 'author', select: `-password` })
     .populate({ path: 'publisher', select: `-password` })
     .populate({ path: 'likes.user', select: `-password` })
@@ -62,7 +63,10 @@ const GetBlogs = asyncHandler(async (req, res) => {
   const pageCount = Math.ceil(+total / +size)
   return res.json({
     status: "success",
-    blogs, total, pageCount, size, page,
+    blogs, total: +total,
+    pageCount: +pageCount,
+    size: +size,
+    page: +page,
   });
 });
 
@@ -71,7 +75,8 @@ const GetUsersBlogs = asyncHandler(async (req, res) => {
   const size = req.query.size || req.params.size;
   const user = req.query.user || req.params.user;
   
-  const blogs = await BlogModel.find({author:user}).sort({ created_at: -1, publish: -1 })
+  const blogs = await BlogModel.find({author:user})
+  .sort({ created_at: -1, publish: -1 })
     .populate({ path: 'author', select: `-password` })
     .populate({ path: 'publisher', select: `-password` })
     .populate({ path: 'likes.user', select: `-password` })
@@ -102,7 +107,9 @@ const GetBlogsInfinitely = asyncHandler(async (req, res) => {
   }
   
   const blogs = await BlogModel.find({publish:true, ...filters})
-    .sort({ created_at: -1, })
+    .sort({
+      'likes.length': 1,
+ })
     .populate({ path: 'author', select: `-password` })
     .populate({ path: 'publisher', select: `-password` })
     .skip(+offset)
@@ -219,7 +226,7 @@ const GetDashBoardStatistics = asyncHandler(async (req, res) => {
   const recentDate = new Date(new Date().getFullYear(),
   new Date().getMonth(), new Date().getDate()-2).toUTCString()
   // const recentBlogs = await BlogModel.find({ created_at: { $gte: recentDate } }, {}).select('-content').populate({path:'author', select:'-password'})
-  const recentBlogs = await BlogModel.find({publish:false}, {}).select('-content').populate({path:'author', select:'-password'}).sort({created_at:-1, publish:-1}).limit(10)
+  const unPublishBlogs = await BlogModel.find({publish:false}, {}).select('-content').populate({path:'author', select:'-password'}).sort({created_at:-1, publish:-1}).limit(10)
   const recentUsers = await user.find().select('-password').limit(10)
   const editorCount = await user.countDocuments({ role: 'editor' })
   
@@ -228,12 +235,12 @@ const GetDashBoardStatistics = asyncHandler(async (req, res) => {
   const subscribersCount = await user.countDocuments()
   
   return res.json({
-    recentBlogs, recentUsers,
+    unPublishBlogs, recentUsers,
     blogCount, editorCount, normalUserCount, adminCount, subscribersCount
   })
 })
 
-const RefetchRecentBlogs = asyncHandler(async(req, res) => {
+const RefetchUnPublishBlogs = asyncHandler(async(req, res) => {
   const recentBlogs = await BlogModel.find({publish:false}, {}).select('-content').populate({path:'author', select:'-password'}).sort({created_at:-1, publish:-1}).limit(10)
   return res.json({recentBlogs})
 })
@@ -375,7 +382,7 @@ module.exports = {
   GetDashBoardStatistics,
   UpdateBlog,
   ToggleBlogPublished,
-  RefetchRecentBlogs,
+  RefetchUnPublishBlogs,
   GetTagBlogs, GetBlogsInfinitely,
   LikeBlog,
   GetUsersBlogs,

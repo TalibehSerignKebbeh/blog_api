@@ -6,7 +6,7 @@ const { PostBlog, GetBlogs, DeleteBlog,
     SetBlogImage, GetSingleBlogById, GetSingleBlogByTitle,
     GetDashBoardStatistics, UpdateBlog,
     ToggleBlogPublished,
-    RefetchRecentBlogs, 
+    RefetchUnPublishBlogs, 
     GetTagBlogs,
     GetBlogsInfinitely,
     LikeBlog,
@@ -28,7 +28,7 @@ router.route('/tags/:tag').get(GetTagBlogs)
 
 router.route('/').post(VerifyJwt,upload.single('image'), PostBlog)
 router.route('/stats').get(VerifyJwt,GetDashBoardStatistics)
-router.route('/stats/recent').get(VerifyJwt,RefetchRecentBlogs)
+router.route('/stats/recent').get(VerifyJwt,RefetchUnPublishBlogs)
 router.route('/stats/user')
     .get(VerifyJwt, GetUserDashboardData)
 router.route('/user')
