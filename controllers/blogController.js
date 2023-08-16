@@ -109,6 +109,7 @@ const GetBlogsInfinitely = asyncHandler(async (req, res) => {
   const blogs = await BlogModel.find({publish:true, ...filters})
     .sort({
       'likes.length': 1,
+      created_at:-1,
  })
     .populate({ path: 'author', select: `-password` })
     .populate({ path: 'publisher', select: `-password` })
