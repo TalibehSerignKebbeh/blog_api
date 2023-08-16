@@ -111,14 +111,15 @@ const DeletAccount = asyncHandler(async (req, res) => {
 const GetAccounts = asyncHandler(async (req, res) => {
   const pageSize = Number(req.query.pageSize) || Number(req.params.pageSize)
   // number of items per page
-  const page = Number(req.query.page) || Number(req.params.page) || 1 // current page number, default to page 1
+  const page = Number(req.query.page) || Number(req.params.page) || 0 // current page number, default to page 1
   const keyword = req.query.keyword
     ? {
       $or: [
         { firstName: { $regex: req.query.keyword, $options: "i" } },
         { lastName: { $regex: req.query.keyword, $options: "i" } },
         { username: { $regex: req.query.keyword, $options: "i" } },
-        { name: { $regex: req.query.keyword, $options: "i" } },
+        { public_name: { $regex: req.query.keyword, $options: "i" } },
+        { role: { $regex: req.query.keyword, $options: "i" } },
       ],
     }
     : {}

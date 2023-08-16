@@ -45,7 +45,17 @@ const GetBlogs = asyncHandler(async (req, res) => {
   const { page, size } = req.query;
   // await BlogModel.updateMany({}, {})
   // const admin = await user.findOne({role:'admin'}).lean().exec()
-  const blogs = await BlogModel.find().sort({ created_at: -1, publish: -1 })
+  const queryFilters = req.query.keyword
+    ? {
+      $or: [
+        { title: { $regex: req.query.keyword, $options: "i" } },
+        { content: { $regex: req.query.keyword, $options: "i" } },
+        { tags: { $regex: req.query.keyword, $options: "i" } },
+       
+      ],
+    }
+    : {}
+  const blogs = await BlogModel.find({...queryFilters}).sort({ created_at: -1, publish: -1,  })
     .populate({ path: 'author', select: `-password -content` })
     .populate({ path: 'likes.user', select: `-password` })
     .skip(+page * +size).limit(+size).exec();
@@ -56,7 +66,7 @@ const GetBlogs = asyncHandler(async (req, res) => {
   //     publisher:blog?.publish ? admin?._id : null,
   //     })
   // }))
-  const total = await BlogModel.countDocuments();
+  const total = await BlogModel.countDocuments({...queryFilters});
   const pageCount = Math.ceil(+total / +size)
   return res.json({
     status: "success",

@@ -18,7 +18,7 @@ const { VerifyJwt } = require('../middlewares/VerifyJwt')
 
 
 router.route('/')
-    .get(GetBlogs)
+    .get(VerifyJwt,GetBlogs)
 
 router.route('/infinite').get(GetBlogsInfinitely)
 router.route('/single')

@@ -5,11 +5,11 @@ const upload = require('../middlewares/upload');
 const router = express.Router()
 
 router.route('/').post(upload.single('profile'), CreateAccount)
-router.route('/').get(GetAccounts)
 router.use(VerifyJwt)
+router.route('/').get(GetAccounts)
 router.route('/:id')
     .get(GetProfile)
-    .put(VerifyJwt, upload.single('profile'), UpdateProfile)
+    .put( upload.single('profile'), UpdateProfile)
     .delete(DeletAccount)
     .patch(DeactivateAccount)
 
