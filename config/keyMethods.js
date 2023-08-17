@@ -3,12 +3,10 @@
 
 
 const validateEmptyOrNull = (input) => {
-    if (input === null || input === undefined) {
+    if (input === null || input === undefined || input === "") {
         false
     }
-    if (input === "") {
-        false
-    }
+   
     return true
 }
 

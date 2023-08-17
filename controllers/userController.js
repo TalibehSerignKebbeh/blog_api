@@ -12,17 +12,57 @@ const CreateAccount = asyncHandler(async (req, res) => {
   const { firstName, lastName,
     username, name, password,
     role, email } = req.body;
-  console.log('here create account');
+ 
+  
 
   let errors = {};
+  if (!validateEmptyOrNull(username) ||
+    !validateEmptyOrNull(password) ||
+    !validateEmptyOrNull(firstName)
+    || !validateEmptyOrNull(lastName)
+  ) {
 
+    if (!validateEmptyOrNull(username)) {
+      errors = { ...errors, username: 'username is required' }
+    } else {
+      if (!usernameRegex.test(username)) {
+        errors = {
+          ...errors,
+          username: usernameErrorMessage
+        }
+
+      }
+    }
+    if (!validateEmptyOrNull(password)) {
+      errors = { ...errors, password: 'password is required' }
+    } else {
+
+      if (!passwordRegex.test(password)) {
+        errors = { ...errors, password: passwordErrorMessage }
+      }
+    }
+    if (!validateEmptyOrNull(firstName)) {
+      errors = { ...errors, firstName: 'firstname is required' }
+    }
+    if (!validateEmptyOrNull(lastName)) {
+      errors = { ...errors, lastName: 'lastname is required' }
+    }
+    // if (!validateEmptyOrNull(email)) {
+    //   errors = { ...errors, email: 'email is required' }
+    // }
+      return res.status(400).json(
+        {status:'error',
+          message: `all fields are required`,
+          errors:errors,
+        })
+    }
+
+  // check if there is username
   const duplicate = await User.findOne({ username: username }, {}, { collation: { strength: 1, locale: 'en' } }).lean().exec()
   console.log(`duplicate username check`, duplicate);
   errors = {};
   if (duplicate) errors = { ...errors, username: `username already exist` }
-  // if(duplicateEmail) errors={...errors, email:`email already in use`}
   if (duplicate) {
-    // console.log(duplicate);
     return res.status(400).json({
       status: 'error',
       message: `username already exist`,
@@ -30,9 +70,10 @@ const CreateAccount = asyncHandler(async (req, res) => {
     })
   }
 
+  // check if there is email then verify it
+  if (!validateEmptyOrNull(email)) {
+    console.log(email);
   const duplicateEmail = await User.findOne({ email: email }).lean().exec()
-  console.log(`duplicate email check `, duplicateEmail);
-
   if (duplicateEmail) errors = { ...errors, email: `email already in use` }
   if (duplicateEmail) {
     // console.log(duplicate);
@@ -41,7 +82,9 @@ const CreateAccount = asyncHandler(async (req, res) => {
       message: `email already exist`,
       errors: errors,
     })
+    }
   }
+    
 
 
 
@@ -55,8 +98,8 @@ const CreateAccount = asyncHandler(async (req, res) => {
     email: email,
   })
 
-  if (newUser) {
-    console.log('user created, sending mail');
+  // if account created and email then send verification email
+  if (newUser  && !validateEmptyOrNull(email)) {
     let transporter = nodemailer.createTransport({
       host: process.env.ETHEREAL_MAIL_HOST,
       port: process.env.ETHEREAL_MAIL_PORT,
@@ -73,12 +116,18 @@ const CreateAccount = asyncHandler(async (req, res) => {
       to: email,
       subject: 'Email Verification',
       text: `Click the following link to verify your email: ${frontendVerifyLink}`
+    }).catch((err) => {
+       return res.json({ message: `account created successfully check your email to verify your account ` })
     })
     // return res.json({message: `user created successfully`})
     return res.json({ message: `account created successfully check your email to verify your account ` })
 
-  } else {
-    return res.json({ message: `something went wrong` })
+  }
+  else if (newUser) {
+    return res.json({message:'account created successfully'})
+  }
+  else {
+    return res.status(400).json({ message: `something went wrong` })
   }
 
 })
@@ -161,6 +210,7 @@ const UpdateProfile = asyncHandler(async (req, res) => {
 
 
   let errors = {};
+
 
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -250,44 +300,3 @@ module.exports = {
 }
 
 
-
-// if (!validateEmptyOrNull(username) ||
-  //   !validateEmptyOrNull(password) ||
-  //   !validateEmptyOrNull(firstName)
-  //   || !validateEmptyOrNull(lastName),
-  //   !validateEmptyOrNull(email)) {
-
-  //   if (!validateEmptyOrNull(username)) {
-  //     errors = { ...errors, username: 'username is required' }
-  //   } else {
-  //     if (!usernameRegex.test(username)) {
-  //       errors = {
-  //         ...errors,
-  //         username: usernameErrorMessage
-  //       }
-
-  //     }
-  //   }
-  //   if (!validateEmptyOrNull(password)) {
-  //     errors = { ...errors, password: 'password is required' }
-  //   } else {
-
-  //     if (!passwordRegex.test(password)) {
-  //       errors = { ...errors, password: passwordErrorMessage }
-  //     }
-  //   }
-  //   if (!validateEmptyOrNull(firstName)) {
-  //     errors = { ...errors, firstName: 'firstname is required' }
-  //   }
-  //   if (!validateEmptyOrNull(lastName)) {
-  //     errors = { ...errors, lastName: 'lastname is required' }
-  //   }
-  //   if (!validateEmptyOrNull(email)) {
-  //     errors = { ...errors, email: 'email is required' }
-  //   }
-  //     return res.status(400).json(
-  //       {status:'error',
-  //         message: `all fields are required`,
-  //         errors:errors,
-  //       })
-  //   }

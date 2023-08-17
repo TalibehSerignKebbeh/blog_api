@@ -12,7 +12,6 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: false,
   },
-    // name that people will see on ur comments
      public_name: {
     type: String,
     required: false,
@@ -26,7 +25,7 @@ const userSchema = new mongoose.Schema({
   },
    email: {
     type: String,
-    required: true,
+    required: false,
     unique: true,
   },
   password: {
