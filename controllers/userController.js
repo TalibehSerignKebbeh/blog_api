@@ -158,10 +158,11 @@ const DeletAccount = asyncHandler(async (req, res) => {
 })
 
 const GetAccounts = asyncHandler(async (req, res) => {
+  // return res.status(400).json({ message: 'testing error'})
   const pageSize = Number(req.query.pageSize) || Number(req.params.pageSize)
   // number of items per page
   const page = Number(req.query.page) || Number(req.params.page) || 0 // current page number, default to page 1
-  const keyword = req.query.keyword
+  const queryFilters = req.query.keyword
     ? {
       $or: [
         { firstName: { $regex: req.query.keyword, $options: "i" } },
@@ -172,13 +173,18 @@ const GetAccounts = asyncHandler(async (req, res) => {
       ],
     }
     : {}
-  const count = await User.countDocuments({ ...keyword }) // count total number of items based on search criteria
-  const users = await User.find({ ...keyword }, {},).select('-password')
+  const count = await User.countDocuments({ ...queryFilters }) // count total number of items based on search criteria
+  const users = await User.find({ ...queryFilters }, {},)
+  .select('-password')
     .limit(pageSize)
     .skip(pageSize * (page)) // paginate the results
     .exec()
 
-  return res.json({ users, page, count, pages: Math.ceil(count / pageSize) })
+  return res.json({
+    users, page: +page,
+    total:+count,
+    count, pages: Math.ceil(count / pageSize)
+  })
 })
 
 const GetProfile = asyncHandler(async (req, res) => {

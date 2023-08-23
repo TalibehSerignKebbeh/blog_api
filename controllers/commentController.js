@@ -11,7 +11,7 @@ const GetCommentsForBlog = asyncHandler(async (req, res) => {
   const limit = req.params.limit || req.query.limit || 1;
   const offset = req.query.offset || req.params.offset || 0;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.json({message: 'invalid id'})
+    return res.status(400).json({message: 'invalid id'})
   }
 
   // console.log(id, page, limit);

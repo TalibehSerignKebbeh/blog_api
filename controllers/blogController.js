@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require("uuid");
 const asyncHandler = require('express-async-handler')
 const upload = require('../middlewares/upload');
 const user = require("../models/user");
+const Notification = require("../models/Notification");
 
 
 const PostBlog = asyncHandler(async (req, res) => {
@@ -25,15 +26,21 @@ created_timezoneOffset,
     image,
     author: currentUser?._id,
     created_at,
-created_timezoneOffset,
 updated_at:created_at,
-updated_timezoneOffset:created_timezoneOffset
     
   });
   if (newBlog) {
+    await Notification.create({
+      message: `${currentUser?.public_name || currentUser?.username} publish ${newBlog?.title}`,
+      date: created_at,
+      model: newBlog?._id?.toString(),
+      user: currentUser?.id,
+      modelname:'blog',for:'admin'
+    })
     return res.json({
       status: "success",
       message: `${newBlog?.title} created `,
+      blogId: newBlog?._id?.toString()
     });
   }
   return res.status(400).json({ status: "error", message: "An error occured" });
@@ -52,18 +59,28 @@ const GetBlogs = asyncHandler(async (req, res) => {
       ],
     }
     : {}
+
   const blogs = await BlogModel.find({ ...queryFilters })
     .sort({ created_at: -1, publish: -1, })
     .populate({ path: 'author', select: `-password` })
     .populate({ path: 'publisher', select: `-password` })
     .populate({ path: 'likes.user', select: `-password` })
-    .skip(+page * +size).limit(+size).exec();
+    .skip(+page * +size).limit(+size)
+    .lean().exec();
+  
+  const blogsWithNotification = await Promise.all(blogs?.map(async (blog) => {
+    const notification = await Notification.findOne({ modelname: 'blog', model: blog?._id })
+      .populate({ path: 'user', select: '-password' })
+      .lean().exec()
+    return {...blog, notification}
+}))
  
   const total = await BlogModel.countDocuments({...queryFilters});
   const pageCount = Math.ceil(+total / +size)
   return res.json({
     status: "success",
-    blogs, total: +total,
+    blogs: blogsWithNotification,
+    total: +total,
     pageCount: +pageCount,
     size: +size,
     page: +page,
@@ -80,7 +97,10 @@ const GetUsersBlogs = asyncHandler(async (req, res) => {
     .populate({ path: 'author', select: `-password` })
     .populate({ path: 'publisher', select: `-password` })
     .populate({ path: 'likes.user', select: `-password` })
-    .skip(+page * +size).limit(+size).exec();
+    .skip(+page * +size).limit(+size)
+    .lean().exec();
+  
+    
   const total = await BlogModel.countDocuments({author:user});
   const pageCount = Math.ceil(+total / +size)
   return res.json({
@@ -95,27 +115,26 @@ const GetBlogsInfinitely = asyncHandler(async (req, res) => {
   const page = req.query.page;
   const size = req.query.size || 10;
   const offset = req.query.offset || 10;
-  const searchKey = req.query.searchKey || req.params.searchKey;
-  let filters = {};
-  if (searchKey?.length) {
-    filters={...filters,...{
-    $or: [
-      { title: { $regex: tag, $options:'i' } },
-      { tags: {$regex:tag, $options:'i'} },
-    ]
-  }}
-  }
+  const keyword = req.query.keyword || req.params.keyword;
+
+  let  filters= keyword?.length? {
+   $or: [
+        { title: { $regex: keyword, $options: "i" } },
+        { content: { $regex: keyword, $options: "i" } },
+        { tags: { $regex: keyword, $options: "i" } },
+      ],
+  } : {}
   
   const blogs = await BlogModel.find({publish:true, ...filters})
     .sort({
-      'likes.length': 1,
       created_at:-1,
  })
     .populate({ path: 'author', select: `-password` })
     .populate({ path: 'publisher', select: `-password` })
     .skip(+offset)
     .limit(+size)
-    .exec();
+        .lean().exec();
+;
 
   const total = await BlogModel.countDocuments({publish:true, ...filters});
   const pageCount = Math.ceil(total / +size);
@@ -127,9 +146,9 @@ const GetBlogsInfinitely = asyncHandler(async (req, res) => {
     blogs,
     total,
     pageCount,
-    size,
+    size:+size,
     page:+page,
-    offset: offsetValue,
+    offset: +offsetValue,
   });
 });
 
@@ -165,7 +184,12 @@ const GetSingleBlogById = asyncHandler(async (req, res) => {
     .populate({ path: 'publisher', select: `-password` })
     .populate({ path: 'likes.user', select: `-password` })
     .lean().exec();
-  return res.json({ blog });
+  
+  if (!blog) return res.status(400).json({ message: `blog was not found` })
+
+  const notification = await Notification.findOne({model:blog?.id}).lean().exec()
+  
+  return res.json({ blog: {...blog, notification} });
 });
 
 const GetSingleBlogByTitle = asyncHandler(async (req, res) => {
@@ -177,9 +201,14 @@ const GetSingleBlogByTitle = asyncHandler(async (req, res) => {
     .populate({ path: 'author', select: `-password` })
     .populate({ path: 'publisher', select: `-password` })
     .populate({ path: 'likes.user', select: `-password` })
-    .exec();
-  if (!blog) return res.status(400).json({ message: `blog was not found` })
-  return res.json({ blog });
+    .lean().exec();
+  if (!blog)
+  {
+    return res.status(400).json({ message: `blog was not found` })
+  }
+
+  const notification = await Notification.findOne({model:blog?.id}).lean().exec()
+  return res.json({ blog: {...blog, notification} });
 });
 
 const UpdateBlog = asyncHandler(async (req, res) => {
@@ -203,6 +232,7 @@ const ToggleBlogPublished = asyncHandler(async (req, res) => {
 
   const id = req.params.id;
   const username = req.user;
+  const date = req.query.date || req.params?.date;
   if (!username) {
     return res.status(400).json({ message: 'Unathorized access',status:'error' });
   }
@@ -213,21 +243,36 @@ const ToggleBlogPublished = asyncHandler(async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ message: 'invalid params',status:'error' });
   }
-  const blog = await BlogModel.findById(id).exec()
+  const blog = await BlogModel.findById(id).lean().exec()
   if(!blog) return res.sendStatus(400).json({message:`Blog not found`})
   await BlogModel.findByIdAndUpdate(id, {
     publish: !blog?.publish,
-    publish_date: !blog.publish ? new Date() : '',
-publisher: !blog?.publish? userObj?._id : null  }).exec();
-  return res.json({ message: `blog ${blog?.publish? 'unpublished':'published'}`, status:'success' });
+    publish_date: !blog.publish ? date : '',
+    publisher: !blog?.publish ? userObj?._id : null
+  }).exec();
+  
+   const userNotification = {
+        message: `${blog?.title} ${!blog?.publish? "published":"unpublished"}`,
+        model: id,user:userObj?._id,date: date,
+        modelname:'blog', for:'user'
+  }
+  await Notification.create({ ...userNotification })
+  
+   const newBlogData = await BlogModel.findById(id)
+      .populate({ path: 'author', select: `-password` })
+      .populate({ path: 'publisher', select: `-password` })
+    .lean().exec()
+  
+  return res.json({
+    message: `blog ${blog?.publish ? 'unpublished' : 'published'}`, status: 'success',
+  blog:newBlogData});
 
 })
 const GetDashBoardStatistics = asyncHandler(async (req, res) => {
   const blogCount = await BlogModel.count()
   const recentDate = new Date(new Date().getFullYear(),
   new Date().getMonth(), new Date().getDate()-2).toUTCString()
-  // const recentBlogs = await BlogModel.find({ created_at: { $gte: recentDate } }, {}).select('-content').populate({path:'author', select:'-password'})
-  const unPublishBlogs = await BlogModel.find({publish:false}, {}).select('-content').populate({path:'author', select:'-password'}).sort({created_at:-1, publish:-1}).limit(10)
+
   const recentUsers = await user.find().select('-password').limit(10)
   const editorCount = await user.countDocuments({ role: 'editor' })
   
@@ -236,14 +281,20 @@ const GetDashBoardStatistics = asyncHandler(async (req, res) => {
   const subscribersCount = await user.countDocuments()
   
   return res.json({
-    unPublishBlogs, recentUsers,
+    recentUsers,
     blogCount, editorCount, normalUserCount, adminCount, subscribersCount
   })
 })
 
 const RefetchUnPublishBlogs = asyncHandler(async(req, res) => {
-  const recentBlogs = await BlogModel.find({publish:false}, {}).select('-content').populate({path:'author', select:'-password'}).sort({created_at:-1, publish:-1}).limit(10)
-  return res.json({recentBlogs})
+  const recentBlogs = await BlogModel.find({ publish: false }, {}).select('-content').populate({ path: 'author', select: '-password' }).sort({ created_at: -1, publish: -1 }).limit(10)
+  const blogsWithNotification = await Promise.all(recentBlogs?.map(async (blog) => {
+    const notification = await Notification.findOne({ modelname: 'blog', model: blog?._id })
+      .populate({ path: 'user', select: '-password' })
+      .lean().exec()
+    return {...blog, notification}
+}))
+  return res.json({recentBlogs: blogsWithNotification})
 })
 
 
