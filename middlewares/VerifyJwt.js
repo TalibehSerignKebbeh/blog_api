@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler')
-const jwt = require("jsonwebtoken")
+const jwt = require("jsonwebtoken");
+const { BlockedStatus } = require('../config/configValues');
 
 const VerifyJwt = asyncHandler(async (req, res, next) => {
     const authHeader = req?.headers?.authorization || req?.headers?.Authorization;
@@ -18,7 +19,10 @@ const VerifyJwt = asyncHandler(async (req, res, next) => {
         process.env.ACCESS_TOKEN_SECRET,
         (err, decoded) => {
             if (err) return res.status(403).json({ message: "Forbidden" })
-            req.role = decoded.AuthData.role;
+            if (Object.values(BlockedStatus)?.includes(decoded?.AuthData?.status)) {
+                return res.status(403).json({ message: "Forbidden user" })
+            }
+            req.role = decoded?.AuthData?.role;
             req.user = decoded.AuthData.user;
             next()
             

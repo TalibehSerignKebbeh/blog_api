@@ -12,7 +12,8 @@ const { PostBlog, GetBlogs, DeleteBlog,
     LikeBlog,
     GetUserDashboardData,
     GetUsersBlogs,
-UserUpdateBlog} = require('../controllers/blogController')
+UserUpdateBlog,
+GetAuthorsBlogs} = require('../controllers/blogController')
 const { VerifyJwt } = require('../middlewares/VerifyJwt')
 
 
@@ -34,6 +35,7 @@ router.route('/stats/user')
 router.route('/user')
     .get(VerifyJwt, GetUsersBlogs)
     .put(VerifyJwt, UserUpdateBlog)
+router.route('/user/:name').get(GetAuthorsBlogs)
 
 router.route('/:id')
     .get(GetSingleBlogById)

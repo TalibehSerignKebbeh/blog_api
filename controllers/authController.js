@@ -20,6 +20,7 @@ const Login = asyncHandler(async (req, res) => {
             "AuthData": {
                 user: user.username,
                 role: user.role,
+                status: user.status,
                 name: user.public_name,
                 id: user?.id
             }
@@ -63,6 +64,7 @@ const getRefreshToken = asyncHandler(async (req, res) => {
                     "AuthData": {
                         user: user.username,
                         role: user.role,
+                        status: user.status,
                         name: user?.public_name,
                         id: user?.id
                     }

@@ -17,6 +17,11 @@ const notificationSchema = mongoose.Schema({
          required: false, ref: 'bloguser',
          default: null
     },
+     target_user: {
+         type: mongoose.Types.ObjectId,
+         required: false, ref: 'bloguser',
+         default: null
+    },
       read_user: {
          type: mongoose.Types.ObjectId,
           required: false, ref: 'bloguser',

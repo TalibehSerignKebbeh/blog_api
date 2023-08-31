@@ -110,7 +110,50 @@ const GetUsersBlogs = asyncHandler(async (req, res) => {
 });
 
 
+// get blogs by searching blogs
 const GetBlogsInfinitely = asyncHandler(async (req, res) => {
+  // const {  offset } = req.query;
+  const page = req.query.page;
+  const size = req.query.size || 10;
+  const offset = req.query.offset || 10;
+  const keyword = req.query.keyword || req.params.keyword;
+
+  let filters = keyword?.length ? {
+   $or: [
+        { title: { $regex: keyword, $options: "i" } },
+        { content: { $regex: keyword, $options: "i" } },
+        { tags: { $regex: keyword, $options: "i" } },
+      ],
+  } : {}
+  
+  const blogs = await BlogModel.find({publish:true, ...filters})
+    .sort({
+      created_at:-1,
+ })
+    .populate({ path: 'author', select: `-password` })
+    .populate({ path: 'publisher', select: `-password` })
+    .skip(+offset)
+    .limit(+size)
+    .lean().exec();
+;
+
+  const total = await BlogModel.countDocuments({publish:true, ...filters});
+  const pageCount = Math.ceil(total / +size);
+  const offsetValue = Number(size) + Number(offset);
+  // const offsetValue = Number(size) + Number(offset);
+  
+  return res.json({
+    status: "success",
+    blogs,
+    total,
+    pageCount,
+    size:+size,
+    page:+page,
+    offset: +offsetValue,
+  });
+});
+
+const GetSearchBlogsInfinitely = asyncHandler(async (req, res) => {
   // const {  offset } = req.query;
   const page = req.query.page;
   const size = req.query.size || 10;
@@ -228,6 +271,9 @@ updated_timezoneOffset }).exec();
 
 })
 
+
+// @private http patch for admins
+// change blog publish status
 const ToggleBlogPublished = asyncHandler(async (req, res) => {
 
   const id = req.params.id;
@@ -254,7 +300,8 @@ const ToggleBlogPublished = asyncHandler(async (req, res) => {
    const userNotification = {
         message: `${blog?.title} ${!blog?.publish? "published":"unpublished"}`,
         model: id,user:userObj?._id,date: date,
-        modelname:'blog', for:'user'
+     modelname: 'blog', for: 'user',
+        target_user:blog?.author
   }
   await Notification.create({ ...userNotification })
   
@@ -268,6 +315,8 @@ const ToggleBlogPublished = asyncHandler(async (req, res) => {
   blog:newBlogData});
 
 })
+
+// @private http get for admins
 const GetDashBoardStatistics = asyncHandler(async (req, res) => {
   const blogCount = await BlogModel.count()
   const recentDate = new Date(new Date().getFullYear(),
@@ -297,7 +346,8 @@ const RefetchUnPublishBlogs = asyncHandler(async(req, res) => {
   return res.json({recentBlogs: blogsWithNotification})
 })
 
-
+// @public method
+// get blogs for a specific tag
 const GetTagBlogs = asyncHandler(async (req, res) => {
 
   const tag = req.params.tag || req.query.tag;
@@ -316,7 +366,11 @@ const GetTagBlogs = asyncHandler(async (req, res) => {
     ]
   }
   
-  const blogs = await BlogModel.find({...queryFilters}).skip(+page * +size).limit(+size).lean();
+  const blogs = await BlogModel.find({ ...queryFilters })
+     .populate({ path: 'author', select: `-password` })
+    .populate({ path: 'publisher', select: `-password` })
+    .populate({ path: 'likes.user', select: `-password` })
+    .skip(+page * +size).limit(+size).lean();
   const total = await BlogModel.countDocuments({...queryFilters})
   return res.json({
     blogs, page, pageSize: size,
@@ -324,6 +378,8 @@ const GetTagBlogs = asyncHandler(async (req, res) => {
   })
 })
 
+// private method
+// toggle blog like
 const LikeBlog = asyncHandler(async (req, res) => {
 
   const id = req.params.id;
@@ -346,6 +402,7 @@ const LikeBlog = asyncHandler(async (req, res) => {
       { new: true }).exec()
      const latest = await BlogModel.findById(id)
       .populate({ path: 'author', select: `-password` })
+      .populate({ path: 'publisher', select: `-password` })
     .populate({ path: 'likes.user', select: `-password` })
  .lean().exec()
     return res.json({
@@ -369,6 +426,8 @@ const LikeBlog = asyncHandler(async (req, res) => {
 })
 
 
+// @private method
+// updating blog
 const UserUpdateBlog = asyncHandler(async (req, res) => {
   const id = req.query.blog || req.params.blog;
   const {title, image, content, tags,} = req.body;
@@ -385,6 +444,9 @@ if (!mongoose.Types.ObjectId.isValid(id)) {
   return res.json({message:`Blog updated`})
 })
 
+
+// @private method
+// users blogs data statistics
 const GetUserDashboardData = asyncHandler(async (req, res) => {
   const userId = req.query.user || req.params.user;
 
@@ -413,6 +475,32 @@ const GetUserDashboardData = asyncHandler(async (req, res) => {
   })
 })
 
+
+// public 
+// get blogs for an author
+const GetAuthorsBlogs = asyncHandler(async (req, res) => {
+  const authorName = req.query.name || req.params.name;
+  const page = req.query.page || req.params.page
+  const size = req.query.size || req.params.size
+  if (!authorName) return res.status(400).json({ message: 'invalid data' })
+  
+  const author = await user.findOne({ public_name: authorName }).lean().exec();
+
+  if (!author) return res.json({ message: 'author found' })
+  
+  const blogs = await BlogModel.find({ author: author?._id })
+     .populate({ path: 'author', select: `-password` })
+    .populate({ path: 'publisher', select: `-password` })
+    .populate({ path: 'likes.user', select: `-password` })
+      .skip(+page * +size).limit(+size).lean().exec()
+    
+  const total = await BlogModel.countDocuments({author: author?._id})
+  return res.json({
+    blogs,total, page: +page, size: +size
+  })
+})
+
+
 function convertBase64ToFile(base64String, filePath) {
   const base64Data = base64String.replace(/^data:image\/\w+;base64,/, "");
   const buffer = Buffer.from(base64Data, "base64");
@@ -440,4 +528,5 @@ module.exports = {
   GetUsersBlogs,
   GetUserDashboardData,
   UserUpdateBlog,
+  GetAuthorsBlogs
 };

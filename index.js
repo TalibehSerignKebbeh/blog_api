@@ -15,11 +15,14 @@ const { Server } = require('socket.io')
 const http = require('http');
 const Notification = require('./models/Notification');
 const { corsoptions } = require('./config/corsOptions');
+const { AllowedRoles } = require('./config/configValues');
 
 
 const httpServer = http.createServer(app)
 
 const io = new Server(httpServer, {
+  allowEIO3: true,
+  
   cors: {
     origin: process.env?.ORIGINS?.split(' '), optionsSuccessStatus: 204,
     credentials: true,
@@ -37,7 +40,7 @@ const io = new Server(httpServer, {
       callback(new Error(`${origin} not allowed by cors`));
     }
 
-  })
+  }),
 })
 
 app.use(cors(corsoptions))
@@ -61,7 +64,18 @@ const PAGE_SIZE = 10; // number of images to display per page
 
 app.post(`/normaldata`, async (req, res) => {
   // const blogs = await BlogModel.find().exec()
-  const updates = await Notification.updateMany({}, { read_user: null, read_date: null })
+  await Notification.updateMany({}, { $set: { target_user: null } })
+  // const blogsData = await BlogModel.find().lean().exec();
+  const noficationsData = await Notification.find().lean().exec();
+  const updates = await Promise.all(noficationsData?.map(async (notyData) => {
+    const blog = await BlogModel.findById(notyData?.model).lean().exec()
+    if (blog) {
+      await Notification.findByIdAndUpdate(notyData?._id, { target_user: blog?.author })
+
+    }
+    const noficationDataLastes = await Notification.findById(notyData?._id).lean().exec()
+    return { ...noficationDataLastes }
+  }))
 
   return res.json({
     message: `done action`,
@@ -99,12 +113,17 @@ app.use('/mbyes_api/v1/comments', require('./routes/commentRoutes'))
 
 
 
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
   // socket._cleanup()
+   socket.on("error", (err) => {
+    console.log(`connect_error due to `);
+    console.dir(err)
+})
   console.log(socket?.connected);
+  console.log(socket?.eventNames());
+ 
   const username = socket?.handshake?.auth?.username;
   const role = socket?.handshake?.auth?.role;
-
   socket.emit('connected', 'You are connected', (callback) => {
     // console.log(callback);
     console.log(callback?.status);
@@ -112,22 +131,37 @@ io.on('connection', (socket) => {
   })
 
   socket.on(`get_notifications`, async ({ role, user }) => {
+
     if (mongoose.Types.ObjectId.isValid(user)) {
+      console.log('get notifications');
       const userData = await User.findById(user).lean().exec()
       if (userData && userData?.role === role) {
 
-        
+        if (role === AllowedRoles?.admin) {
           const notifications = await Notification.find({
             read: false, for: role,
-         })
-          .populate({ path: 'user', select: `-password` })
-          .populate({ path: 'model', model: 'blogs' })
-          .lean().exec()
-        if (role === 'admin') {
-        socket.emit(`notifications`, notifications)
-          
+          })
+            .populate({ path: 'user', select: `-password` })
+            .populate({ path: 'model', model: 'blogs' })
+            .lean().exec()
+          socket.emit(`notifications_${role}`, notifications)
+
+          socket.emit(`notifications_${role}`, notifications)
         }
-        socket.emit(`notifications_${user}`, notifications)
+        else {
+          const notifications = await Notification.find({
+            read: false, for: role, target_user: user
+          }).lean().exec()
+
+            .populate({ path: 'user', select: `-password` })
+            .populate({ path: 'target_user', select: `-password` })
+            .populate({ path: 'model', model: 'blogs' })
+            .lean().exec()
+          socket.emit(`notifications_${role}_${user}`, notifications)
+
+          socket.emit(`notifications_${role}_${user}`, notifications)
+        }
+
       }
 
     }
@@ -158,7 +192,7 @@ io.on('connection', (socket) => {
     }
   })
 
-  socket.on('blog_publish', async ({ id, userId, date }, callback) => {
+  socket.on('blog_publish', async ({ id, userId, date, }, callback) => {
     console.log('publishing blog');
     if (mongoose.Types.ObjectId.isValid(id) && mongoose.Types.ObjectId.isValid(userId)) {
       await BlogModel.findByIdAndUpdate(id,
@@ -175,7 +209,8 @@ io.on('connection', (socket) => {
       const userNotification = {
         message: `${blog?.title} publish`,
         model: id, user: userId, date: date,
-        modelname: 'blog', for: 'user'
+        modelname: 'blog', for: 'user',
+        target_user: blog?.author?._id
       }
       await Notification.create({ ...userNotification })
 
@@ -188,25 +223,50 @@ io.on('connection', (socket) => {
   })
 
   socket.on(`read_notification`, async (data) => {
-
+    console.log(data);
+    // if (data?.ids?.length) {
+      
+    // }
     if (mongoose.Types.ObjectId.isValid(data?.userId)) {
       const userData = await User.findById(data?.userId).lean().exec()
       if (!userData) return;
-    const readed = await Notification.updateMany({
-      _id: data?.ids, read: false, user: null
-    },
-      {
-        read: true, read_by: data?.userId,
-        read_date: data?.date || new Date()
-      })
+      const readed = await Notification.updateMany({
+        _id: data?.ids, read: false, read_user: null
+      },
+        {
+          read: true, read_user: data?.userId,
+          read_date: data?.date || new Date()
+        })
+      console.log(readed);
       // to be completed for user and admin emits 
-    if (readed?.acknowledged) {
-      socket.broadcast.emit(`notification_read`, data?.ids)
-      socket.emit(`notification_read`, data?.ids)
+      if (readed?.acknowledged) {
+        socket.broadcast.emit(`notification_read`, data?.ids)
+        socket.emit(`notification_read`, data?.ids)
       }
     }
-      
+
     // console.log(readed);
+  })
+
+  socket.on(`blog_published`, async ({ blogId, target_user }) => {
+    if (mongoose.Types.ObjectId.isValid(target_user) && mongoose.Types.ObjectId.isValid(blogId)) {
+
+      const notification = await Notification.findOne({ target_user, model: blogId }).lean().exec()
+
+      if (notification) {
+        const newNotification = await Notification.findOne({ target_user, model: blogId })
+          .populate({ path: 'user', select: `-password` })
+          .populate({ path: 'target_user', select: `-password` })
+          .populate({ path: 'model', model: 'blogs' })
+          .lean().exec()
+        socket.emit(`user_blog_notify_${target_user}`, newNotification)
+      }
+      const blog = await BlogModel.findById(blogId)
+        .populate({ path: 'author', select: `-password` })
+        .populate({ path: 'publisher', select: `-password` })
+        .lean().exec()
+      socket.emit(`blog_publish_${blogId}`, blog)
+    }
   })
 
 
@@ -227,8 +287,11 @@ io.on('disconnect', (socket) => {
 
 
 mongoose.connection.once("open", () => {
+  // io.once(`open`, () => {
+   
   httpServer.listen(port, () => {
     // console.log(process.env.ORIGINS?.split(' ')?.length);
     console.log("App running on port", port);
   })
+//  }) 
 })

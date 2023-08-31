@@ -1,5 +1,7 @@
 const express = require('express');
-const { CreateAccount, DeletAccount, GetAccounts, DeactivateAccount, GetProfile, UpdateProfile } = require('../controllers/userController');
+const { CreateAccount, DeletAccount, GetAccounts,
+    DeactivateAccount, GetProfile,
+    UpdateProfile, ChangeAccountStatus } = require('../controllers/userController');
 const {VerifyJwt} = require('../middlewares/VerifyJwt')
 const upload = require('../middlewares/upload');
 const router = express.Router()
@@ -12,6 +14,7 @@ router.route('/:id')
     .put( upload.single('profile'), UpdateProfile)
     .delete(DeletAccount)
     .patch(DeactivateAccount)
+router.route('/:id/status_change').put(ChangeAccountStatus)
 
 
 module.exports = router;

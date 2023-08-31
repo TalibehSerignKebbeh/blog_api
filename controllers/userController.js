@@ -6,12 +6,12 @@ const { v4: uuidv4 } = require("uuid");
 const { validateEmptyOrNull, passwordRegex, usernameRegex, usernameErrorMessage, passwordErrorMessage } = require('../config/keyMethods');
 const nodemailer = require('nodemailer')
 const crypto = require('crypto')
-
+const {DefinedStatus, AllowedRoles} = require('../config/configValues')
 
 const CreateAccount = asyncHandler(async (req, res) => {
   const { firstName, lastName,
     username, name, password,
-    role, email } = req.body;
+    role, email, date } = req.body;
  
   
 
@@ -116,14 +116,28 @@ const CreateAccount = asyncHandler(async (req, res) => {
       to: email,
       subject: 'Email Verification',
       text: `Click the following link to verify your email: ${frontendVerifyLink}`
-    }).catch((err) => {
-       return res.json({ message: `account created successfully check your email to verify your account ` })
+    })
+    await Notification.create({
+      message: `a user with username ${newUser?.username} registered`,
+      date: date || Date.now(),
+      model: null,
+      user: newUser?.id,
+      modelname: AllowedRoles.user,
+      for: AllowedRoles.admin
     })
     // return res.json({message: `user created successfully`})
     return res.json({ message: `account created successfully check your email to verify your account ` })
 
   }
   else if (newUser) {
+    await Notification.create({
+      message: `a user with username ${newUser?.username} registered`,
+      date: date || Date.now(),
+      model: newUser?.id,
+      user: newUser?.id,
+      modelname: 'user',
+      for: 'admin'
+    })
     return res.json({message:'account created successfully'})
   }
   else {
@@ -144,6 +158,30 @@ const DeactivateAccount = asyncHandler(async (req, res) => {
   await User.updateOne({ _id: id }, { active: !user?.active })
 
   return res.json({ message: `account ${user?.active ? 'deactivated' : 'activated'}` })
+})
+
+
+//private put 
+// for changing accounts status
+const ChangeAccountStatus = asyncHandler(async (req, res) => {
+  const id = req.params.id || req.query.id;
+  const updatedStatus = req.body.status;
+
+  
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: 'invalid data params' })
+  }
+  if (!Object.values(DefinedStatus)?.includes(updatedStatus)) {
+    return res.status(400).json({message:'invalid data'})
+  }
+  const user = await User.findById(id).lean().exec()
+  if (!user) return res.status(400).json({ message: 'account not found' })
+
+  const updatedUser =await User.findByIdAndUpdate(id,  { status: updatedStatus }, {new:true, lean:true})
+  if (updatedUser) {
+   
+  return res.json({ message: `account ${updatedUser?.status} successfully` })
+ }
 })
 
 const DeletAccount = asyncHandler(async (req, res) => {
@@ -302,7 +340,7 @@ module.exports = {
   GetAccounts,
   DeactivateAccount,
   GetProfile,
-  UpdateProfile
+  UpdateProfile,ChangeAccountStatus
 }
 
 
