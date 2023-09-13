@@ -23,9 +23,19 @@ const validateUsername = (input, min, max,) => {
         false
     }
     if (input?.length < min) {
-
+       return false
+    }
+    if (!usernameRegex.test(input)) {
+        return false
     }
     return true
+}
+
+const emailRegex = /^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,4}$/;
+
+// Function to validate an email address
+function validateEmail(email) {
+  return emailRegex.test(email);
 }
 
 const passwordErrorMessage = 'password is required, with at least 5 characters and at most 16 characters and must contain atleast a an uppercase, lowercase letter and one of the special characters (@$!%*#?&)'
@@ -35,5 +45,7 @@ module.exports = {
     usernameRegex,
     passwordRegex,
     usernameErrorMessage,
-    passwordErrorMessage
+    passwordErrorMessage,
+    validateEmail,
+    validateUsername
 }

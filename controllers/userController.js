@@ -3,10 +3,11 @@ const { convertBase64ToFile } = require('../config/saveImage');
 const User = require('../models/user')
 const asyncHandler = require('express-async-handler')
 const { v4: uuidv4 } = require("uuid");
-const { validateEmptyOrNull, passwordRegex, usernameRegex, usernameErrorMessage, passwordErrorMessage } = require('../config/keyMethods');
+const { validateEmptyOrNull, passwordRegex, usernameRegex, usernameErrorMessage, passwordErrorMessage, validateUsername, validateEmail } = require('../config/keyMethods');
 const nodemailer = require('nodemailer')
 const crypto = require('crypto')
-const {DefinedStatus, AllowedRoles} = require('../config/configValues')
+const {DefinedStatus, AllowedRoles} = require('../config/configValues');
+const Notification = require('../models/Notification');
 
 const CreateAccount = asyncHandler(async (req, res) => {
   const { firstName, lastName,
@@ -162,12 +163,11 @@ const DeactivateAccount = asyncHandler(async (req, res) => {
 
 
 //private put 
-// for changing accounts status
+// to change account's status
 const ChangeAccountStatus = asyncHandler(async (req, res) => {
   const id = req.params.id || req.query.id;
   const updatedStatus = req.body.status;
 
-  
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ message: 'invalid data params' })
   }
@@ -180,8 +180,55 @@ const ChangeAccountStatus = asyncHandler(async (req, res) => {
   const updatedUser =await User.findByIdAndUpdate(id,  { status: updatedStatus }, {new:true, lean:true})
   if (updatedUser) {
    
-  return res.json({ message: `account ${updatedUser?.status} successfully` })
+    return res.json({
+      message: `account ${updatedUser?.status} successfully`,
+ })
  }
+})
+
+
+//private patch 
+// to change account's role
+const ChangeUserRole = asyncHandler(async (req, res) => {
+  const userId = req.params.id || req.query.id;
+  const username = req.user;
+  if (!username) {
+    return res.status(400).json({ message: 'unauthorized action',status:'error' })
+  }
+  const user = await User.findOne({ username: username }).lean().exec()
+  if (!user) {
+    return res.status(400).json({ message: 'unauthorized action',status:'error' })
+  }
+   if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return res.status(400).json({ message: 'invalid data params',status:'error' })
+  }
+
+  const newRole = req.body.role;
+  const date = req.body.date;
+
+  if (!newRole || !Object.values(AllowedRoles).includes(newRole)) {
+    return res.status(400).json({message:'invalid data', status:"error"})
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(userId, {
+    role: newRole, updated_date:date || Date.now()
+  }, {new:true, lean:true, timestamps:true})
+  
+  if (!updatedUser) {
+    return res.status(400).json({message:'data not found', status:'error'})
+  }
+  const newNotification = await Notification.create({
+      message: `your account role was updated to ${updatedUser?.role}`,
+      date: date || Date.now(),
+      target_user: updatedUser?.id,
+      user: user?.id,
+      modelname: AllowedRoles.user,
+      for: AllowedRoles.user
+    })
+
+  return res.json({
+    message: "account updated successfully", status: 'success',
+  notificationId: newNotification?._id})
 })
 
 const DeletAccount = asyncHandler(async (req, res) => {
@@ -246,16 +293,13 @@ const GetProfile = asyncHandler(async (req, res) => {
 
 })
 
+
 const UpdateProfile = asyncHandler(async (req, res) => {
   const id = req.params.id || req.query.id;
   const { firstName, lastName,
     username, public_name, password,
     email } = req.body;
-
-
-  let errors = {};
-
-
+ 
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ message: 'invalid data parameters' })
@@ -266,6 +310,31 @@ const UpdateProfile = asyncHandler(async (req, res) => {
     return res.status(400).json({
       status: 'error',
       message: 'account not found',
+    })
+  }
+  let errors = {};
+  if (!firstName) errors['firstName'] = 'firstname is required';
+  if (firstName && !firstName?.length) errors['firstName'] = 'firstname cannot be empty';
+
+  if (!lastName) errors['lastName'] = 'lastname is required';
+  if (lastName && !lastName?.length) errors['lastName'] = 'lastname cannot be empty';
+
+  if (!email) errors['email'] = 'email is required';
+  if (email && !email?.length) errors['email'] = 'email cannot be empty';
+  if (email && !validateEmail(email)) errors['email'] = 'email is invalid';
+
+
+  if (!username) errors['username'] = 'username is required';
+  if (username && !validateUsername(username, 4, 16)) errors['username'] = 'username is invalid';
+
+  if (!public_name) errors['public_name'] = 'public name is required';
+  if (public_name && !public_name?.length) errors['public_name'] = 'public name cannot be empty';
+  if (public_name && !validateUsername(public_name)) errors['public_name'] = 'public name is invalid';
+
+  if (Object.values(errors)?.length) {
+     return res.status(400).json({
+      status: 'error',
+      errors: { ...errors }
     })
   }
 
@@ -334,13 +403,24 @@ const UpdateProfile = asyncHandler(async (req, res) => {
 })
 
 
+const GetRecentRegisteredUsers = asyncHandler(async (req, res) => {
+  
+  const users = await User.find({}, {}, { lean: true }).sort({ createdAt: -1 });
+  return res.json({users: users, status:'success'})
+})
+
+
+
+
 module.exports = {
   CreateAccount,
   DeletAccount,
   GetAccounts,
   DeactivateAccount,
   GetProfile,
-  UpdateProfile,ChangeAccountStatus
+  UpdateProfile, ChangeAccountStatus,
+  GetRecentRegisteredUsers,
+  ChangeUserRole
 }
 
 

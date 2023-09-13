@@ -1,6 +1,7 @@
 const BlogModel = require("../models/BlogModel");
 const fs = require("fs");
 const { default: mongoose } = require("mongoose");
+const {MongoClient} = require('mongodb')
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 const asyncHandler = require('express-async-handler')
@@ -116,7 +117,8 @@ const GetBlogsInfinitely = asyncHandler(async (req, res) => {
   const page = req.query.page;
   const size = req.query.size || 10;
   const offset = req.query.offset || 10;
-  const keyword = req.query.keyword || req.params.keyword;
+  const keyword = req.query.keyword || req.params.keyword || '';
+console.log(keyword);
 
   let filters = keyword?.length ? {
    $or: [
@@ -125,8 +127,8 @@ const GetBlogsInfinitely = asyncHandler(async (req, res) => {
         { tags: { $regex: keyword, $options: "i" } },
       ],
   } : {}
-  
-  const blogs = await BlogModel.find({publish:true, ...filters})
+
+  const blogs = await BlogModel.find({ publish: true, ...filters })
     .sort({
       created_at:-1,
  })

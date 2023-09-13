@@ -63,23 +63,26 @@ const IMAGES_DIR = './images'; // directory where images are stored
 const PAGE_SIZE = 10; // number of images to display per page
 
 app.post(`/normaldata`, async (req, res) => {
-  // const blogs = await BlogModel.find().exec()
-  await Notification.updateMany({}, { $set: { target_user: null } })
-  // const blogsData = await BlogModel.find().lean().exec();
-  const noficationsData = await Notification.find().lean().exec();
-  const updates = await Promise.all(noficationsData?.map(async (notyData) => {
-    const blog = await BlogModel.findById(notyData?.model).lean().exec()
-    if (blog) {
-      await Notification.findByIdAndUpdate(notyData?._id, { target_user: blog?.author })
+  
+  const user = await User.findOne({ role: "user", public_name: "batch_samba" }).lean().exec()
+  
+  const blogs = await BlogModel.find().lean()
 
+  const updates = await Promise.all(blogs?.map(async (blog) => {
+    const author = await User.findById(blog?.author).lean().exec()
+    if (!author) {
+    const newBlog =  await BlogModel.findByIdAndUpdate(blog?._id, { author: user?._id }, {
+        new: true,timestamps:true, lean:true
+    })
+    return {...newBlog}
     }
-    const noficationDataLastes = await Notification.findById(notyData?._id).lean().exec()
-    return { ...noficationDataLastes }
+    return {...blog}
   }))
-
+  
+  const updatedBlogs = await BlogModel.find().populate({ path: "author", select: '-password' }).select('title author').lean();
   return res.json({
     message: `done action`,
-    updates
+    blogs: updatedBlogs
   })
 })
 // Route for getting images
@@ -115,9 +118,15 @@ app.use('/mbyes_api/v1/comments', require('./routes/commentRoutes'))
 
 io.on('connection', async (socket) => {
   // socket._cleanup()
-   socket.on("error", (err) => {
-    console.log(`connect_error due to `);
-    console.dir(err)
+   socket.on("error", (callback) => {
+     console.dir(callback)
+     console.log('connection error');
+    
+     callback({
+       status: 'error',
+       message: 'error connecting the server'
+     })
+     
 })
   console.log(socket?.connected);
   console.log(socket?.eventNames());
@@ -135,11 +144,13 @@ io.on('connection', async (socket) => {
     if (mongoose.Types.ObjectId.isValid(user)) {
       console.log('get notifications');
       const userData = await User.findById(user).lean().exec()
+      // console.log(userData);
       if (userData && userData?.role === role) {
 
         if (role === AllowedRoles?.admin) {
           const notifications = await Notification.find({
             read: false, for: role,
+            date:{$gt: userData?.created_date}
           })
             .populate({ path: 'user', select: `-password` })
             .populate({ path: 'model', model: 'blogs' })
@@ -150,9 +161,8 @@ io.on('connection', async (socket) => {
         }
         else {
           const notifications = await Notification.find({
-            read: false, for: role, target_user: user
-          }).lean().exec()
-
+            read: false,target_user: user
+          })
             .populate({ path: 'user', select: `-password` })
             .populate({ path: 'target_user', select: `-password` })
             .populate({ path: 'model', model: 'blogs' })
@@ -269,6 +279,17 @@ io.on('connection', async (socket) => {
     }
   })
 
+  // user account change
+  // role and status change
+  socket.on(`account_status`, async ({ user, target_user, notificationId }) => {
+    const notification = await Notification.findById(notificationId)
+       .populate({ path: 'user', select: `-password` })
+            .populate({ path: 'target_user', select: `-password` })
+      .populate({ path: 'model', model: 'blogs' })
+      .lean()
+    socket.broadcast.emit(`account_status_${target_user}`, notification)
+    
+  })
 
 })
 

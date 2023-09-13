@@ -54,7 +54,17 @@ const userSchema = new mongoose.Schema({
     required: false,
     
   },
-}, {});
+  created_date: {
+    type: Date,
+    default: Date.now,
+  },
+  updated_date: {
+    type: Date,
+    default: Date.now,
+  }
+}, {
+  timestamps:true,
+});
 
 // userSchema.virtual('fullname', {
 //   getters(data) {

@@ -54,6 +54,6 @@ const blogSchema = mongoose.Schema({
 })
 
 
-blogSchema.index({content:'text', title:'text', tags:'text'})
+// blogSchema.index({content:'text', title:'text', tags:'text'})
 
 module.exports = mongoose.model('blogs', blogSchema)
